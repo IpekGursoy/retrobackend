@@ -72,7 +72,7 @@ async function main() {
     });
 
     socket.on('join session', async (sessionId, callback) => {
-      const normalizedId = (sessionId || '').trim().toUpperCase();s
+      const normalizedId = (sessionId || '').trim().toUpperCase();
       const session = await db.get(
         'SELECT id, name FROM sessions WHERE id = ?',
         normalizedId
