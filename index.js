@@ -131,24 +131,31 @@ async function main() {
         return;
       }
 
-      let result;
+      let messageId;
 
       try {
-        result = await db.run(
+        const result = await db.run(
           'INSERT INTO messages (content, client_offset, session_id) VALUES (?, ?, ?)',
           msg,
           clientOffset,
           socket.sessionId
         );
+        messageId = result.lastID;
       } catch (e) {
         if (e.errno !== 19) {
           callback?.({ error: 'Failed to save message' });
           return;
         }
+
+        const existing = await db.get(
+          'SELECT id FROM messages WHERE client_offset = ?',
+          clientOffset
+        );
+        messageId = existing?.id;
       }
 
-      if (result) {
-        io.to(socket.sessionId).emit('chat message', msg, result.lastID);
+      if (messageId) {
+        socket.to(socket.sessionId).emit('chat message', msg, messageId);
       }
 
       callback?.();
