@@ -148,6 +148,24 @@ async function main() {
     await db.exec('ALTER TABLE messages ADD COLUMN session_id TEXT');
   }
 
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      content TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      deleted_at DATETIME,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (session_id) REFERENCES sessions(id)
+    );
+  `);
+
+  const commentColumns = await db.all('PRAGMA table_info(comments)');
+  const hasCommentSessionId = commentColumns.some((col) => col.name === 'session_id');
+  if (!hasCommentSessionId) {
+    await db.exec('ALTER TABLE comments ADD COLUMN session_id TEXT');
+  }
+
   const app = express();
   app.use(express.json());
   app.use((req, res, next) => {
@@ -223,6 +241,27 @@ async function main() {
 
     const token = await createAuthToken(db, user.id);
     res.json({ token, username: user.username });
+  });
+
+  app.post('/auth/login-without-account', async (req, res) => {
+    try {
+      const username = `guest-${randomBytes(4).toString('hex')}`;
+      const randomPassword = randomBytes(16).toString('hex');
+      const { salt, hash } = await hashPassword(randomPassword);
+
+      const result = await db.run(
+        'INSERT INTO users (username, password_hash, password_salt) VALUES (?, ?, ?)',
+        username,
+        hash,
+        salt
+      );
+
+      const token = await createAuthToken(db, result.lastID);
+      res.json({ token, username });
+    } catch (error) {
+      console.error('guest login failed:', error);
+      res.status(500).json({ error: 'Guest login failed.' });
+    }
   });
 
   app.get('/auth/me', async (req, res) => {
@@ -443,8 +482,6 @@ async function main() {
         return;
       }
 
-<<<<<<< Updated upstream
-=======
       const session = await db.get(
         'SELECT ended_at FROM sessions WHERE id = ?',
         socket.sessionId
@@ -455,7 +492,6 @@ async function main() {
         return;
       }
 
->>>>>>> Stashed changes
       let messageId;
 
       try {
